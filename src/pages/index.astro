@@ -1,0 +1,25 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Header from '../components/layout/Header.tsx'
+import Footer from '../components/layout/Footer.tsx'
+import Hero from '../components/landing/Hero.tsx'
+import Features from '../components/landing/Features.tsx'
+import CTA from '../components/landing/CTA.tsx'
+import { AuthProvider } from '../components/auth/AuthProvider.tsx'
+---
+
+<Layout title="SKY DUMP - Secure Video Upload Service">
+	<AuthProvider client:load>
+		<div class="min-h-screen bg-gray-50 flex flex-col">
+			<Header client:load />
+
+			<main class="flex-1">
+				<Hero client:load />
+				<Features client:load />
+				<CTA client:load />
+			</main>
+
+			<Footer client:load />
+		</div>
+	</AuthProvider>
+</Layout>

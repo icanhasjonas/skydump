@@ -1,0 +1,20 @@
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' data: https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://*.google.com; font-src fonts.gstatic.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; script-src 'self' 'unsafe-inline' static.cloudflareinsights.com https://*.googletagmanager.com; connect-src 'self' cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://*.google.com;
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  X-Frame-Options: DENY
+  Cache-Control: max-age=3600
+  X-Hello: SnVzdCBhIHByb2plY3QgSSBtYWRlIHNvIEkgY291bGQgbGVhcm4gbW9yZSBhYm91dCBBc3RybywgZm9yIGEgYnVuZ2Fsb3cgc2l0ZSBpbiB0aGFpbGFuZC4=
+
+/information/:title/
+  X-Information: Information about ":title"
+
+
+/usr/*
+  ! Content-Security-Policy
+  Cache-Control: public, max-age=604800, immutable
+
+/etc/*
+  Cache-Control: public, max-age=604800, immutable
+
+/lib/*
+  Cache-Control: public, max-age=604800, immutable

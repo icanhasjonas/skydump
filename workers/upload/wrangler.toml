@@ -1,0 +1,27 @@
+name = "sky-dump-upload"
+main = "upload.ts"
+compatibility_date = "2023-12-01"
+
+[[kv_namespaces]]
+binding = "UPLOAD_KV"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+[env.production.vars]
+B2_APPLICATION_KEY_ID = ""
+B2_APPLICATION_KEY = ""
+B2_BUCKET_ID = ""
+B2_BUCKET_NAME = ""
+JWT_SECRET = ""
+
+[env.development.vars]
+B2_APPLICATION_KEY_ID = ""
+B2_APPLICATION_KEY = ""
+B2_BUCKET_ID = ""
+B2_BUCKET_NAME = ""
+JWT_SECRET = "dev-secret-key-change-in-production"
+
+# Routes for the upload worker
+[[routes]]
+pattern = "*/upload/*"
+zone_name = "your-domain.com"

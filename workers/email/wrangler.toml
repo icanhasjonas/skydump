@@ -1,0 +1,22 @@
+name = "sky-dump-email"
+main = "email.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Send Email binding for admin notifications
+send_email = [
+  { name = "ADMIN_EMAIL", destination_address = "admin@sky-dump.pages.dev" }
+]
+
+[env.production.vars]
+FROM_EMAIL = "noreply@sky-dump.pages.dev"
+JWT_SECRET = ""
+
+[env.development.vars]
+FROM_EMAIL = "noreply@localhost"
+JWT_SECRET = "dev-secret-key-change-in-production"
+
+# Routes for the email worker - configure with your actual domain
+# [[routes]]
+# pattern = "*/email/*"
+# zone_name = "your-domain.com"
