@@ -13,43 +13,11 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center space-x-6 text-sm text-gray-500">
-            <span>Powered by Astro + Cloudflare + B2</span>
+            <span>Lanta Dev Team</span>
             <span>©️ {new Date().getFullYear()}</span>
           </div>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Features</h3>
-              <ul className="space-y-1">
-                <li>• Large file uploads (up to 5GB)</li>
-                <li>• Multiple file support</li>
-                <li>• Real-time progress tracking</li>
-                <li>• Secure Google authentication</li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Supported Formats</h3>
-              <ul className="space-y-1">
-                <li>• MP4, MOV, AVI</li>
-                <li>• MKV, WebM</li>
-                <li>• All major video formats</li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-medium text-gray-900 mb-2">Security</h3>
-              <ul className="space-y-1">
-                <li>• Google OAuth authentication</li>
-                <li>• Secure file storage</li>
-                <li>• Rate limiting protection</li>
-                <li>• HTTPS encryption</li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </footer>
   )
