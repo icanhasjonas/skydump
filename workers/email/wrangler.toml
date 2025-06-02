@@ -12,7 +12,7 @@ send_email = [
 FROM_EMAIL = "noreply@sky-dump.pages.dev"
 JWT_SECRET = ""
 
-[env.development.vars]
+[env.preview.vars]
 FROM_EMAIL = "noreply@localhost"
 JWT_SECRET = "dev-secret-key-change-in-production"
 

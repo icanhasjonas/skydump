@@ -10,7 +10,7 @@ PUBLIC_GOOGLE_REDIRECT_URI = "https://sky-dump.pages.dev/auth/callback"
 PUBLIC_AUTH_WORKER_URL = "https://sky-dump-auth.your-subdomain.workers.dev"
 PUBLIC_UPLOAD_WORKER_URL = "https://sky-dump-upload.your-subdomain.workers.dev"
 
-[env.development.vars]
+[env.preview.vars]
 PUBLIC_GOOGLE_CLIENT_ID = ""
 PUBLIC_GOOGLE_REDIRECT_URI = "http://localhost:4321/auth/callback"
 PUBLIC_AUTH_WORKER_URL = "http://localhost:8787"

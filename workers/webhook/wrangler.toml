@@ -7,7 +7,7 @@ binding = "UPLOAD_KV"
 id = "your-kv-namespace-id"
 preview_id = "your-preview-kv-namespace-id"
 
-[env.production.vars]
+[env.preview.vars]
 JWT_SECRET = ""
 EMAIL_WORKER_URL = "https://sky-dump-email.your-subdomain.workers.dev"
 WEBHOOK_SECRET = ""

@@ -8,7 +8,7 @@ GOOGLE_CLIENT_SECRET = ""
 GOOGLE_REDIRECT_URI = "https://sky-dump.pages.dev/auth/callback"
 JWT_SECRET = ""
 
-[env.development.vars]
+[env.preview.vars]
 GOOGLE_CLIENT_ID = ""
 GOOGLE_CLIENT_SECRET = ""
 GOOGLE_REDIRECT_URI = "http://localhost:4321/auth/callback"
