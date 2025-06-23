@@ -69,18 +69,19 @@ PUBLIC_GOOGLE_REDIRECT_URI=http://localhost:4321/auth/callback
 # JWT Secret (generate a strong random string)
 JWT_SECRET=your_jwt_secret_key_here
 
-# B2 Backblaze Configuration
-B2_APPLICATION_KEY_ID=your_b2_key_id_here
-B2_APPLICATION_KEY=your_b2_application_key_here
-B2_BUCKET_ID=your_b2_bucket_id_here
-B2_BUCKET_NAME=your_b2_bucket_name_here
+# Cloudflare R2 Configuration
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id_here
+R2_ACCESS_KEY_ID=your_r2_access_key_id_here
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key_here
+R2_BUCKET_NAME=your_r2_bucket_name_here
 
 # Email Service Configuration
 EMAIL_API_KEY=your_email_api_key_here
 FROM_EMAIL=noreply@localhost
 
-# Webhook Secret (generate a strong random string)
-WEBHOOK_SECRET=your_webhook_secret_here
+# Email Service Configuration
+EMAIL_API_KEY=your_email_api_key_here
+FROM_EMAIL=noreply@yourdomain.com
 
 # Development Worker URLs
 PUBLIC_AUTH_WORKER_URL=http://localhost:8787
@@ -125,7 +126,6 @@ cd workers
 start_worker "Auth Worker" 8787 "auth"
 start_worker "Upload Worker" 8788 "upload"
 start_worker "Email Worker" 8789 "email"
-start_worker "Webhook Worker" 8790 "webhook"
 
 echo ""
 echo "✅ All workers started!"
@@ -211,7 +211,7 @@ show_completion_message() {
     print_status "Next steps:"
     echo "1. Update the .env file with your configuration values"
     echo "2. Set up Google OAuth credentials"
-    echo "3. Configure B2 Backblaze storage"
+    echo "3. Configure Cloudflare R2 storage"
     echo "4. Set up email service credentials"
     echo ""
     print_status "Development commands:"

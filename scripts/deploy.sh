@@ -94,9 +94,7 @@ deploy_workers() {
     print_success "Email Worker deployed"
 
     # Deploy Webhook Worker
-    print_status "Deploying Webhook Worker..."
-    cd workers/webhook
-    npx wrangler deploy
+    print_status "Webhook worker removed - no longer needed with R2 integration"
     cd ../..
     print_success "Webhook Worker deployed"
 
@@ -135,7 +133,7 @@ check_environment() {
     fi
 
     # Check if required environment variables are set
-    required_vars=("GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET" "JWT_SECRET" "B2_APPLICATION_KEY_ID" "B2_APPLICATION_KEY" "B2_BUCKET_ID" "B2_BUCKET_NAME")
+    required_vars=("GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET" "JWT_SECRET" "CLOUDFLARE_ACCOUNT_ID" "R2_ACCESS_KEY_ID" "R2_SECRET_ACCESS_KEY" "R2_BUCKET_NAME")
 
     for var in "${required_vars[@]}"; do
         if [ -z "${!var}" ]; then
@@ -227,8 +225,7 @@ main() {
     echo ""
     print_status "Next steps:"
     echo "1. Update environment variables in Cloudflare Pages and Workers"
-    echo "2. Configure B2 webhooks (optional)"
-    echo "3. Test the application"
+    echo "2. Test the application"
     echo "4. Set up monitoring and alerts"
     echo ""
     print_status "For more information, see the README.md file"

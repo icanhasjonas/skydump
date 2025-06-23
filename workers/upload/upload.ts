@@ -1,27 +1,20 @@
 /**
  * Cloudflare Worker for Video Upload Management
- * Handles B2 Backblaze integration and upload coordination
+ * Handles Cloudflare R2 integration and upload coordination
  */
 
 interface Env {
-  B2_APPLICATION_KEY_ID: string
-  B2_APPLICATION_KEY: string
-  B2_BUCKET_ID: string
-  B2_BUCKET_NAME: string
+  CLOUDFLARE_ACCOUNT_ID: string
+  R2_ACCESS_KEY_ID: string
+  R2_SECRET_ACCESS_KEY: string
+  R2_BUCKET_NAME: string
   JWT_SECRET: string
   UPLOAD_KV: any
 }
 
-interface B2AuthResponse {
-  authorizationToken: string
-  apiUrl: string
-  downloadUrl: string
-}
-
-interface B2UploadUrlResponse {
-  bucketId: string
+interface R2UploadResponse {
   uploadUrl: string
-  authorizationToken: string
+  fields: Record<string, string>
 }
 
 interface UploadSession {
@@ -143,23 +136,21 @@ async function handleUploadInit(request: Request, env: Env, user: any, corsHeade
   }
 
   try {
-    // Authenticate with B2
-    const b2Auth = await authenticateB2(env)
-
-    // Get upload URL from B2
-    const uploadUrlResponse = await getB2UploadUrl(b2Auth, env)
-
-    // Generate unique file ID
+    // Generate unique file ID and object key
     const fileId = crypto.randomUUID()
     const timestamp = new Date().toISOString()
+    const objectKey = `${fileId}_${fileName}`
+
+    // Generate presigned URL for R2 upload
+    const uploadUrl = await generateR2PresignedUrl(env, objectKey, contentType)
 
     // Store upload session in KV
     const session: UploadSession = {
       fileId,
       fileName,
       fileSize,
-      uploadUrl: uploadUrlResponse.uploadUrl,
-      authToken: uploadUrlResponse.authorizationToken,
+      uploadUrl,
+      authToken: '', // Not needed for R2 presigned URLs
       userId: user.sub,
       createdAt: timestamp,
     }
@@ -168,14 +159,12 @@ async function handleUploadInit(request: Request, env: Env, user: any, corsHeade
       expirationTtl: 3600, // 1 hour
     })
 
-    // Create a proxy upload URL that goes through our worker
-    const proxyUploadUrl = `${new URL(request.url).origin}/upload/proxy/${fileId}`
-
     return new Response(JSON.stringify({
       fileId,
       fileName,
       fileSize,
-      uploadUrl: proxyUploadUrl,
+      uploadUrl,
+      objectKey,
       chunkSize: 5 * 1024 * 1024, // 5MB chunks
     }), {
       headers: {
@@ -251,9 +240,8 @@ async function handleUploadComplete(request: Request, env: Env, user: any, corsH
     // Clean up session
     await env.UPLOAD_KV.delete(`session:${fileId}`)
 
-    // Generate download URL (B2 file URL)
-    const b2Auth = await authenticateB2(env)
-    const downloadUrl = `${b2Auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${fileId}_${fileName}`
+    // Generate R2 download URL
+    const downloadUrl = `https://${env.R2_BUCKET_NAME}.${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${fileId}_${fileName}`
 
     return new Response(JSON.stringify({
       fileId,
@@ -380,41 +368,81 @@ async function handleListUploads(request: Request, env: Env, user: any, corsHead
   }
 }
 
-// B2 Backblaze utility functions
-async function authenticateB2(env: Env): Promise<B2AuthResponse> {
-  const credentials = btoa(`${env.B2_APPLICATION_KEY_ID}:${env.B2_APPLICATION_KEY}`)
+// Cloudflare R2 utility functions
+async function generateR2PresignedUrl(env: Env, objectKey: string, contentType?: string): Promise<string> {
+  const endpoint = `https://${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`
+  const region = 'auto'
+  const method = 'PUT'
 
-  const response = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-    method: 'GET',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-    },
+  // Create AWS signature for R2 (S3-compatible)
+  const timestamp = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '')
+  const date = timestamp.substr(0, 8)
+
+  const credentialScope = `${date}/${region}/s3/aws4_request`
+  const credential = `${env.R2_ACCESS_KEY_ID}/${credentialScope}`
+
+  const params = new URLSearchParams({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': credential,
+    'X-Amz-Date': timestamp,
+    'X-Amz-Expires': '3600', // 1 hour
+    'X-Amz-SignedHeaders': 'host',
   })
 
-  if (!response.ok) {
-    throw new Error('B2 authentication failed')
+  if (contentType) {
+    params.set('X-Amz-Content-Type', contentType)
   }
 
-  return await response.json()
+  const canonicalRequest = [
+    method,
+    `/${env.R2_BUCKET_NAME}/${objectKey}`,
+    params.toString(),
+    'host:' + `${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    '',
+    'host',
+    'UNSIGNED-PAYLOAD'
+  ].join('\n')
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    timestamp,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join('\n')
+
+  const signature = await createSignature(env.R2_SECRET_ACCESS_KEY, date, region, 's3', stringToSign)
+  params.set('X-Amz-Signature', signature)
+
+  return `${endpoint}/${env.R2_BUCKET_NAME}/${objectKey}?${params.toString()}`
 }
 
-async function getB2UploadUrl(b2Auth: B2AuthResponse, env: Env): Promise<B2UploadUrlResponse> {
-  const response = await fetch(`${b2Auth.apiUrl}/b2api/v2/b2_get_upload_url`, {
-    method: 'POST',
-    headers: {
-      'Authorization': b2Auth.authorizationToken,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      bucketId: env.B2_BUCKET_ID,
-    }),
-  })
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
-  if (!response.ok) {
-    throw new Error('Failed to get B2 upload URL')
-  }
+async function createSignature(secretKey: string, date: string, region: string, service: string, stringToSign: string): Promise<string> {
+  const kDate = await hmac(`AWS4${secretKey}`, date)
+  const kRegion = await hmac(kDate, region)
+  const kService = await hmac(kRegion, service)
+  const kSigning = await hmac(kService, 'aws4_request')
+  const signature = await hmac(kSigning, stringToSign)
 
-  return await response.json()
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function hmac(key: string | ArrayBuffer, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    typeof key === 'string' ? new TextEncoder().encode(key) : key,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+
+  return await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message))
 }
 
 // JWT utility function (same as auth worker)

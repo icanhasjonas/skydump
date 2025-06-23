@@ -5,7 +5,7 @@ Building a modern video upload landing page with:
 - **Frontend**: Astro 5.8 + React components + TailwindCSS
 - **Authentication**: Google OAuth with session management
 - **File Upload**: Uppy Drag & Drop with custom progress indicators (authenticated users only)
-- **Storage**: B2 Backblaze with signed URLs via Cloudflare Workers
+- **Storage**: Cloudflare R2 with presigned URLs via Cloudflare Workers
 - **Notifications**: Cloudflare Email Workers
 - **Progress**: Real-time upload progress tracking
 
@@ -19,11 +19,10 @@ graph TB
     D -->|Session Token| E[Authenticated Dashboard]
     E -->|Drag/Drop Videos| F[Uppy Drag & Drop Component]
     F -->|Request Upload URL + Auth| G[Cloudflare Worker - Upload API]
-    G -->|Verify Session + Generate Signed URL| H[B2 Backblaze Storage]
+    G -->|Verify Session + Generate Presigned URL| H[Cloudflare R2 Storage]
     F -->|Direct Upload with Progress| H
-    H -->|Upload Complete| I[Cloudflare Worker - Webhook]
-    I -->|Send Notification| J[Cloudflare Email Workers]
-    J -->|Email with User Info| K[Designated Email Address]
+    H -->|Upload Complete| I[Cloudflare Email Workers]
+    I -->|Email with User Info| J[Designated Email Address]
 
     subgraph "Astro Frontend"
         B
@@ -37,7 +36,6 @@ graph TB
         D
         G
         I
-        J
     end
 
     subgraph "Google Services"
@@ -86,7 +84,7 @@ graph TB
 ### Phase 3: Uppy Upload Component (Protected)
 1. **VideoUploader Component** (`src/components/VideoUploader.tsx`)
    - Uppy Core with Drag & Drop plugin
-   - XHR Upload plugin for direct B2 uploads
+   - XHR Upload plugin for direct R2 uploads
    - Video file type validation (mp4, mov, avi, mkv, webm, etc.)
    - Multiple file selection support
    - Custom drag & drop visual feedback
@@ -127,14 +125,14 @@ graph TB
 
 2. **Upload URL Generator Worker** (`workers/upload-api.ts`)
    - Verify user authentication before generating URLs
-   - Generate B2 signed upload URLs with user context
+   - Generate R2 presigned upload URLs with user context
    - Handle CORS for frontend requests
    - Validate file types and sizes
    - Rate limiting per authenticated user
    - Return upload URLs for Uppy XHR plugin
 
-3. **Upload Completion Webhook Worker** (`workers/upload-webhook.ts`)
-   - Receive B2 upload completion notifications
+3. **Email Notification Integration**
+   - Direct integration with upload completion
    - Associate uploads with authenticated users
    - Trigger email notifications with user context
    - Log upload events with user information
@@ -147,18 +145,18 @@ graph TB
    - Include file details, metadata, and user information
    - User-specific notification preferences
 
-### Phase 5: B2 Backblaze Integration
+### Phase 5: Cloudflare R2 Integration
 1. **Configuration Setup**
-   - B2 bucket configuration for video storage
+   - R2 bucket configuration for video storage
    - CORS settings for direct uploads from browser
    - Lifecycle policies for file management
    - Public/private access configuration
 
-2. **Signed URL Generation**
-   - B2 API integration in Cloudflare Worker
-   - Secure credential management
+2. **Presigned URL Generation**
+   - R2 S3-compatible API integration in Cloudflare Worker
+   - Secure credential management with AWS signature v4
    - Upload URL expiration handling (1 hour)
-   - Pre-signed URL generation for large files
+   - Presigned URL generation for large files
 
 ### Phase 6: Environment & Security
 1. **Environment Variables**
@@ -169,12 +167,11 @@ graph TB
    GOOGLE_REDIRECT_URI
    JWT_SECRET
 
-   # B2 Backblaze
-   B2_APPLICATION_KEY_ID
-   B2_APPLICATION_KEY
-   B2_BUCKET_ID
-   B2_BUCKET_NAME
-   B2_ENDPOINT_URL
+   # Cloudflare R2
+   CLOUDFLARE_ACCOUNT_ID
+   R2_ACCESS_KEY_ID
+   R2_SECRET_ACCESS_KEY
+   R2_BUCKET_NAME
 
    # Notifications
    NOTIFICATION_EMAIL
@@ -226,7 +223,6 @@ sky-dump/
 ├── workers/
 │   ├── auth.ts
 │   ├── upload-api.ts
-│   ├── upload-webhook.ts
 │   └── email-worker.ts
 ├── public/
 │   └── assets/
@@ -263,11 +259,10 @@ sky-dump/
 5. User drags/selects video files into Uppy drag zone
 6. Uppy validates file types and sizes locally
 7. Frontend requests signed upload URLs from Cloudflare Worker (with auth token)
-8. Worker validates user session and generates signed URLs
-9. Uppy XHR plugin uploads directly to B2 with progress tracking
+8. Worker validates user session and generates presigned URLs
+9. Uppy XHR plugin uploads directly to R2 with progress tracking
 10. Custom progress components show real-time upload status
-11. Upload completion triggers B2 webhook to Cloudflare Worker
-12. Email notification sent with user and file information
+11. Upload completion triggers email notification with user and file information
 13. User upload history updated
 
 ## 📧 Email Notification Template
@@ -286,7 +281,7 @@ File Details:
 - Size: {filesize}
 - Upload Time: {timestamp}
 - Upload Duration: {duration}
-- Storage Location: {b2_url}
+- Storage Location: {r2_url}
 
 Upload Details:
 - File Type: {mimetype}
@@ -296,7 +291,7 @@ Upload Details:
 
 ---
 SKY DUMP Video Upload Service
-Powered by Astro + Cloudflare + B2
+Powered by Astro + Cloudflare + R2
 ```
 
 ## 🚀 Deployment Strategy
@@ -314,7 +309,7 @@ Powered by Astro + Cloudflare + B2
 4. Configure authorized redirect URIs
 5. Set up consent screen
 
-### B2 Backblaze Setup
+### Cloudflare R2 Setup
 1. Create bucket with appropriate access settings
 2. Generate application keys with upload permissions
 3. Configure CORS for direct browser uploads:
@@ -350,4 +345,4 @@ Powered by Astro + Cloudflare + B2
 - **Error Recovery**: Automatic retry with exponential backoff
 - **Memory Management**: Efficient file handling without loading entire files into memory
 
-This architecture provides a robust, scalable video upload solution with excellent user experience, leveraging Uppy's minimal drag & drop interface with custom progress indicators, and reliable backend processing through Cloudflare Workers and B2 storage.
+This architecture provides a robust, scalable video upload solution with excellent user experience, leveraging Uppy's minimal drag & drop interface with custom progress indicators, and reliable backend processing through Cloudflare Workers and R2 storage.

@@ -17,9 +17,8 @@
 
 #### Backend (Cloudflare Workers)
 - ✅ **Authentication Worker** - OAuth token exchange and JWT management
-- ✅ **Upload Worker** - B2 Backblaze integration with signed URLs
+- ✅ **Upload Worker** - Cloudflare R2 integration with presigned URLs
 - ✅ **Email Worker** - Notification system with HTML templates
-- ✅ **Webhook Worker** - Upload completion event processing
 
 #### Development & Testing
 - ✅ **Development Environment** - Complete setup scripts and tooling
@@ -44,7 +43,7 @@
 ### Backend Stack
 - **Cloudflare Workers** - Serverless edge computing
 - **Cloudflare KV** - Key-value storage for sessions and metadata
-- **B2 Backblaze** - Cloud storage for video files
+- **Cloudflare R2** - S3-compatible object storage for video files
 - **JWT** - Secure authentication tokens
 - **Email Service** - Mailgun/SendGrid integration
 
@@ -61,8 +60,8 @@
 #### 📁 Upload Process
 1. User drags video file to upload area
 2. File validation (type, size, format)
-3. Request signed URL from upload worker
-4. Direct upload to B2 Backblaze storage
+3. Request presigned URL from upload worker
+4. Direct upload to Cloudflare R2 storage
 5. Progress tracking with real-time updates
 6. Webhook notification on completion
 7. Email confirmation sent to user
@@ -103,8 +102,7 @@ sky-dump/
 ├── workers/                  # Cloudflare Workers
 │   ├── auth/                 # Authentication worker
 │   ├── upload/               # Upload handling worker
-│   ├── email/                # Email notification worker
-│   └── webhook/              # Webhook processing worker
+│   └── email/                # Email notification worker
 ├── tests/                    # Test files
 ├── scripts/                  # Deployment scripts
 └── docs/                     # Documentation
@@ -114,7 +112,7 @@ sky-dump/
 
 ### Prerequisites Configured
 - Google OAuth 2.0 credentials setup
-- B2 Backblaze bucket and API keys
+- Cloudflare R2 bucket and API keys
 - Email service (Mailgun/SendGrid) configuration
 - Cloudflare account with Workers and KV
 
@@ -246,4 +244,4 @@ The project is ready for immediate deployment and can handle production workload
 
 **Status**: ✅ **COMPLETE AND PRODUCTION READY**
 **Last Updated**: December 2024
-**Technology Stack**: Astro 5.8, React 18, TypeScript, Cloudflare Workers, B2 Backblaze
+**Technology Stack**: Astro 5.8, React 18, TypeScript, Cloudflare Workers, Cloudflare R2

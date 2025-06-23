@@ -6,7 +6,7 @@ A modern video upload service built with Astro 5.8, featuring Google OAuth authe
 
 - **🔐 Google OAuth Authentication** - Secure user authentication with Google
 - **📁 Drag & Drop Upload** - Intuitive file upload with Uppy
-- **☁️ Cloud Storage** - B2 Backblaze integration for reliable storage
+- **☁️ Cloud Storage** - Cloudflare R2 integration for reliable storage
 - **📧 Email Notifications** - Automated upload confirmation emails
 - **🔄 Real-time Progress** - Live upload progress tracking
 - **📱 Responsive Design** - Works on all devices
@@ -20,7 +20,7 @@ A modern video upload service built with Astro 5.8, featuring Google OAuth authe
 - Node.js 18+ and npm
 - Cloudflare account (for Workers and Pages)
 - Google Cloud Console account (for OAuth)
-- B2 Backblaze account (for storage)
+- Cloudflare account with R2 enabled (for storage)
 - Email service account (Mailgun/SendGrid)
 
 ### 1. Clone and Install
@@ -57,18 +57,19 @@ PUBLIC_GOOGLE_REDIRECT_URI=http://localhost:4321/auth/callback
 # JWT Secret (generate a strong random string)
 JWT_SECRET=your_jwt_secret_key_here
 
-# B2 Backblaze Configuration
-B2_APPLICATION_KEY_ID=your_b2_key_id_here
-B2_APPLICATION_KEY=your_b2_application_key_here
-B2_BUCKET_ID=your_b2_bucket_id_here
-B2_BUCKET_NAME=your_b2_bucket_name_here
+# Cloudflare R2 Configuration
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id_here
+R2_ACCESS_KEY_ID=your_r2_access_key_id_here
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key_here
+R2_BUCKET_NAME=your_r2_bucket_name_here
 
 # Email Service Configuration
 EMAIL_API_KEY=your_email_api_key_here
 FROM_EMAIL=noreply@yourdomain.com
 
-# Webhook Secret (generate a strong random string)
-WEBHOOK_SECRET=your_webhook_secret_here
+# Email Service Configuration
+EMAIL_API_KEY=your_email_api_key_here
+FROM_EMAIL=noreply@yourdomain.com
 ```
 
 ### 4. Start Development
@@ -96,9 +97,9 @@ npm run dev:full
    - `http://localhost:4321/auth/callback` (development)
    - `https://yourdomain.com/auth/callback` (production)
 
-### B2 Backblaze Setup
+### Cloudflare R2 Setup
 
-1. Create account at [Backblaze B2](https://www.backblaze.com/b2/)
+1. Enable R2 in your Cloudflare dashboard
 2. Create a bucket for video storage
 3. Generate application key with read/write permissions
 4. Configure CORS settings for your domain
@@ -147,8 +148,7 @@ sky-dump/
 ├── workers/
 │   ├── auth/               # Authentication worker
 │   ├── upload/             # Upload handling worker
-│   ├── email/              # Email notification worker
-│   └── webhook/            # Webhook processing worker
+│   └── email/              # Email notification worker
 ├── tests/                  # Test files
 └── scripts/                # Deployment scripts
 ```
@@ -185,7 +185,6 @@ chmod +x scripts/deploy.sh
    cd workers/auth && wrangler deploy
    cd ../upload && wrangler deploy
    cd ../email && wrangler deploy
-   cd ../webhook && wrangler deploy
    ```
 
 2. **Deploy Site:**
@@ -203,7 +202,6 @@ PUBLIC_GOOGLE_REDIRECT_URI=https://yourdomain.com/auth/callback
 PUBLIC_AUTH_WORKER_URL=https://auth-worker.yourname.workers.dev
 PUBLIC_UPLOAD_WORKER_URL=https://upload-worker.yourname.workers.dev
 EMAIL_WORKER_URL=https://email-worker.yourname.workers.dev
-WEBHOOK_WORKER_URL=https://webhook-worker.yourname.workers.dev
 ```
 
 ## 🔒 Security Features
@@ -213,7 +211,7 @@ WEBHOOK_WORKER_URL=https://webhook-worker.yourname.workers.dev
 - **Input Validation** - Server-side validation for all inputs
 - **File Type Validation** - Only allow specific video formats
 - **Rate Limiting** - Prevent abuse with request limits
-- **Webhook Verification** - Secure webhook payload verification
+- **Secure Upload URLs** - Time-limited presigned URLs for direct uploads
 
 ## 📊 Monitoring
 
@@ -268,7 +266,7 @@ npm run deploy             # Deploy to production
 - Check for trailing slashes in URLs
 
 **Upload Failures:**
-- Verify B2 credentials and bucket permissions
+- Verify R2 credentials and bucket permissions
 - Check CORS configuration
 - Ensure file size limits are appropriate
 
@@ -306,7 +304,7 @@ LOG_LEVEL=debug
 
 ### Webhook Endpoints
 
-- `POST /webhook/upload-complete` - Handle upload completion
+
 
 ## 🤝 Contributing
 
