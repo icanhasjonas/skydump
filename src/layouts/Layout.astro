@@ -4,19 +4,40 @@ import "../styles/uppy.css"
 
 export interface Props {
   title: string
+  description?: string
 }
 
-const { title } = Astro.props
+const { title, description = "Upload video files up to 5GB. Fast, simple, no account needed." } = Astro.props
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://sky-dump.duplo.workers.dev")
+const ogImageUrl = new URL("/og-image.jpg", Astro.site || "https://sky-dump.duplo.workers.dev")
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content="SKY DUMP - Video upload service" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalUrl.href} />
+
     <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl.href} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImageUrl.href} />
+    <meta property="og:image:width" content="1456" />
+    <meta property="og:image:height" content="816" />
+    <meta property="og:site_name" content="SKY DUMP" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl.href} />
   </head>
   <body>
     <slot />
