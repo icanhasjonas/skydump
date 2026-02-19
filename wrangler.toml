@@ -16,5 +16,10 @@ bucket_name = "sky-dump"
 binding = "KV"
 id = "11246a3142cb4050bfa1bfbd60684a4c"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "sky-dump"
+database_id = "fc4a2b18-69d5-4edf-907f-0cd94a4d04a5"
+
 [observability]
 enabled = true

@@ -1,6 +1,11 @@
 import type { APIRoute } from "astro"
 
-// POST /api/upload/multipart - initiate multipart upload
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+
 export const POST: APIRoute = async ({ locals, request }) => {
   const { env } = locals.runtime
 
@@ -8,52 +13,36 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const { fileName, contentType } = body
 
   if (!fileName) {
-    return new Response(JSON.stringify({ error: "fileName required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "fileName required" }, 400)
   }
 
   const fileId = crypto.randomUUID()
   const objectKey = `${fileId}/${fileName}`
+  const ct = contentType || "application/octet-stream"
 
   try {
     const multipart = await env.R2.createMultipartUpload(objectKey, {
-      httpMetadata: { contentType: contentType || "application/octet-stream" },
-      customMetadata: {
-        originalName: fileName,
-        uploadedAt: new Date().toISOString(),
-      },
+      httpMetadata: { contentType: ct },
+      customMetadata: { originalName: fileName },
     })
 
-    // Store multipart info in KV for subsequent part uploads
     await env.KV.put(
       `multipart:${fileId}`,
       JSON.stringify({
         uploadId: multipart.uploadId,
         objectKey,
         fileName,
+        contentType: ct,
         parts: [],
       }),
-      { expirationTtl: 60 * 60 * 24 }, // 24h to complete upload
+      { expirationTtl: 60 * 60 * 24 },
     )
 
-    return new Response(
-      JSON.stringify({
-        fileId,
-        uploadId: multipart.uploadId,
-        objectKey,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
+    return json({ fileId, uploadId: multipart.uploadId, objectKey })
   } catch (err) {
     console.error("Multipart init failed:", err)
-    return new Response(JSON.stringify({ error: "Failed to init multipart upload" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "Failed to init multipart upload" }, 500)
   }
 }
+
+export const ALL: APIRoute = () => json({ error: "Method not allowed" }, 405)

@@ -1,6 +1,11 @@
 import type { APIRoute } from "astro"
 
-// PUT /api/upload/part?fileId=xxx&partNumber=N - upload a single part
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+
 export const PUT: APIRoute = async ({ locals, request, url }) => {
   const { env } = locals.runtime
 
@@ -8,50 +13,31 @@ export const PUT: APIRoute = async ({ locals, request, url }) => {
   const partNumber = Number.parseInt(url.searchParams.get("partNumber") || "0", 10)
 
   if (!fileId || !partNumber) {
-    return new Response(JSON.stringify({ error: "fileId and partNumber required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "fileId and partNumber required" }, 400)
   }
 
   try {
     const multipartData = await env.KV.get(`multipart:${fileId}`)
     if (!multipartData) {
-      return new Response(JSON.stringify({ error: "Multipart upload not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      })
+      return json({ error: "Multipart upload not found" }, 404)
     }
 
-    const { uploadId, objectKey, parts } = JSON.parse(multipartData)
+    const parsed = JSON.parse(multipartData)
+    const { uploadId, objectKey, parts } = parsed
 
-    // Resume the multipart upload and upload this part
     const multipart = env.R2.resumeMultipartUpload(objectKey, uploadId)
     const part = await multipart.uploadPart(partNumber, request.body as ReadableStream)
 
-    // Update parts list in KV
     parts.push({ partNumber, etag: part.etag })
-    await env.KV.put(
-      `multipart:${fileId}`,
-      JSON.stringify({ uploadId, objectKey, parts, fileName: JSON.parse(multipartData).fileName }),
-      { expirationTtl: 60 * 60 * 24 },
-    )
+    await env.KV.put(`multipart:${fileId}`, JSON.stringify({ ...parsed, parts }), {
+      expirationTtl: 60 * 60 * 24,
+    })
 
-    return new Response(
-      JSON.stringify({
-        partNumber,
-        etag: part.etag,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
+    return json({ partNumber, etag: part.etag })
   } catch (err) {
     console.error("Part upload failed:", err)
-    return new Response(JSON.stringify({ error: "Part upload failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "Part upload failed" }, 500)
   }
 }
+
+export const ALL: APIRoute = () => json({ error: "Method not allowed" }, 405)

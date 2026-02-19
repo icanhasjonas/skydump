@@ -1,7 +1,11 @@
 import type { APIRoute } from "astro"
 
-// Direct upload - streams request body to R2
-// For files up to ~100MB this is the simplest path
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+
 export const POST: APIRoute = async ({ locals, request }) => {
   const { env } = locals.runtime
 
@@ -9,10 +13,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const contentType = request.headers.get("content-type") || "application/octet-stream"
 
   if (!fileName) {
-    return new Response(JSON.stringify({ error: "x-file-name header required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "x-file-name header required" }, 400)
   }
 
   const fileId = crypto.randomUUID()
@@ -21,42 +22,28 @@ export const POST: APIRoute = async ({ locals, request }) => {
   try {
     const object = await env.R2.put(objectKey, request.body, {
       httpMetadata: { contentType },
-      customMetadata: {
-        originalName: fileName,
-        uploadedAt: new Date().toISOString(),
-      },
+      customMetadata: { originalName: fileName },
     })
 
-    // Store metadata in KV for listing
-    await env.KV.put(
-      `upload:${fileId}`,
-      JSON.stringify({
-        fileId,
-        objectKey,
-        fileName,
-        size: object.size,
-        uploadedAt: new Date().toISOString(),
-      }),
-      { expirationTtl: 60 * 60 * 24 * 365 }, // 1 year
+    await env.DB.prepare(
+      "INSERT INTO uploads (id, file_name, file_size, object_key, content_type, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
+      .bind(
+        fileId,
+        fileName,
+        object.size,
+        objectKey,
+        contentType,
+        request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for"),
+        request.headers.get("user-agent"),
+      )
+      .run()
 
-    return new Response(
-      JSON.stringify({
-        fileId,
-        fileName,
-        size: object.size,
-        objectKey,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
+    return json({ fileId, fileName, size: object.size, objectKey })
   } catch (err) {
     console.error("Upload failed:", err)
-    return new Response(JSON.stringify({ error: "Upload failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    })
+    return json({ error: "Upload failed" }, 500)
   }
 }
+
+export const ALL: APIRoute = () => json({ error: "Method not allowed" }, 405)

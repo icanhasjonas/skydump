@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react"
 import Uppy from "@uppy/core"
 import DragDrop from "@uppy/drag-drop"
 import ProgressBar from "@uppy/progress-bar"
+import { useEffect, useRef, useState } from "react"
 
 const CHUNK_SIZE = 50 * 1024 * 1024 // 50MB chunks for multipart
 const DIRECT_UPLOAD_LIMIT = 95 * 1024 * 1024 // ~95MB - use direct upload below this
@@ -264,7 +264,13 @@ export default function VideoUploader() {
                       onClick={() => removeFile(file.id)}
                       className="text-white/50 hover:text-red-300 transition-colors"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-label="Remove file"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
