@@ -1,14 +1,29 @@
 ---
-import Layout from '../layouts/Layout.astro'
-import Header from '../components/layout/Header.tsx'
-import Footer from '../components/layout/Footer.tsx'
-import Hero from '../components/landing/Hero.tsx'
-import CTA from '../components/landing/CTA.tsx'
-import { AuthProvider } from '../components/auth/AuthProvider.tsx'
+import Layout from "../layouts/Layout.astro"
+import Header from "../components/layout/Header.tsx"
+import Footer from "../components/layout/Footer.tsx"
+import VideoUploader from "../components/upload/VideoUploader.tsx"
 ---
 
-<Layout title="SKY DUMP - Secure Video Upload Service">
-	<AuthProvider client:load>
-		<Hero client:load />
-	</AuthProvider>
+<Layout title="SKY DUMP - Video Upload">
+  <div class="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 text-white flex flex-col">
+    <Header client:load />
+
+    <main class="flex-1 flex flex-col items-center justify-center px-4 py-12">
+      <div class="text-center mb-8">
+        <h1 class="text-5xl md:text-6xl font-bold mb-4">
+          <span class="text-yellow-300">SKY</span> DUMP
+        </h1>
+        <p class="text-xl text-blue-100 max-w-2xl mx-auto">
+          Upload video files up to 5GB. Fast, simple, no account needed.
+        </p>
+      </div>
+
+      <div class="w-full max-w-3xl">
+        <VideoUploader client:load />
+      </div>
+    </main>
+
+    <Footer client:load />
+  </div>
 </Layout>

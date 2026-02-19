@@ -1,6 +1,6 @@
 ---
-import '../styles/globals.css'
-import '../styles/uppy.css'
+import "../styles/globals.css"
+import "../styles/uppy.css"
 
 export interface Props {
   title: string
@@ -9,11 +9,11 @@ export interface Props {
 const { title } = Astro.props
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="description" content="SKY DUMP - Secure video upload service" />
+    <meta name="description" content="SKY DUMP - Video upload service" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
@@ -22,14 +22,3 @@ const { title } = Astro.props
     <slot />
   </body>
 </html>
-
-<style is:global>
-  html {
-    font-family: system-ui, sans-serif;
-  }
-
-  body {
-    margin: 0;
-    padding: 0;
-  }
-</style>

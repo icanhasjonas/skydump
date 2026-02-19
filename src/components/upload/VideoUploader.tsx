@@ -1,104 +1,147 @@
-import { useEffect, useRef, useState, useContext } from 'react'
-import Uppy from '@uppy/core'
-import DragDrop from '@uppy/drag-drop'
-import XHRUpload from '@uppy/xhr-upload'
-import { AuthContext, type AuthContextType } from '../auth/AuthProvider'
+import { useEffect, useRef, useState } from "react"
+import Uppy from "@uppy/core"
+import DragDrop from "@uppy/drag-drop"
+import ProgressBar from "@uppy/progress-bar"
+
+const CHUNK_SIZE = 50 * 1024 * 1024 // 50MB chunks for multipart
+const DIRECT_UPLOAD_LIMIT = 95 * 1024 * 1024 // ~95MB - use direct upload below this
 
 interface UploadedFile {
   id: string
   name: string
   size: number
   progress: number
-  status: 'uploading' | 'success' | 'error'
+  status: "pending" | "uploading" | "success" | "error"
   error?: string
-  url?: string
+  fileId?: string
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`
+}
+
+async function uploadDirect(file: File, onProgress: (pct: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", "/api/upload")
+    xhr.setRequestHeader("x-file-name", file.name)
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream")
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const data = JSON.parse(xhr.responseText)
+        resolve(data.fileId)
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error("Network error"))
+    xhr.send(file)
+  })
+}
+
+async function uploadMultipart(file: File, onProgress: (pct: number) => void): Promise<string> {
+  // 1. Init multipart
+  const initRes = await fetch("/api/upload/multipart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+    }),
+  })
+
+  if (!initRes.ok) throw new Error("Failed to init multipart upload")
+  const { fileId } = await initRes.json()
+
+  // 2. Upload parts
+  const totalParts = Math.ceil(file.size / CHUNK_SIZE)
+  let uploadedBytes = 0
+
+  for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+    const start = (partNumber - 1) * CHUNK_SIZE
+    const end = Math.min(start + CHUNK_SIZE, file.size)
+    const chunk = file.slice(start, end)
+
+    const partRes = await fetch(`/api/upload/part?fileId=${fileId}&partNumber=${partNumber}`, {
+      method: "PUT",
+      body: chunk,
+    })
+
+    if (!partRes.ok) throw new Error(`Failed to upload part ${partNumber}`)
+
+    uploadedBytes += end - start
+    onProgress(Math.round((uploadedBytes / file.size) * 100))
+  }
+
+  // 3. Complete
+  const completeRes = await fetch("/api/upload/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileId }),
+  })
+
+  if (!completeRes.ok) throw new Error("Failed to complete multipart upload")
+  return fileId
 }
 
 export default function VideoUploader() {
-  const authContext = useContext(AuthContext) as AuthContextType | undefined
-  const user = authContext?.user || null
-  const uppyRef = useRef<Uppy | null>(null)
   const dragDropRef = useRef<HTMLDivElement>(null)
+  const progressRef = useRef<HTMLDivElement>(null)
+  const uppyRef = useRef<Uppy | null>(null)
   const [files, setFiles] = useState<UploadedFile[]>([])
-  const [isDragOver, setIsDragOver] = useState(false)
 
   useEffect(() => {
     if (!dragDropRef.current) return
 
-    // Initialize Uppy
     const uppy = new Uppy({
       restrictions: {
         maxFileSize: 5 * 1024 * 1024 * 1024, // 5GB
-        allowedFileTypes: ['video/*'],
-        maxNumberOfFiles: 10
+        allowedFileTypes: ["video/*"],
+        maxNumberOfFiles: 10,
       },
-      autoProceed: false
+      autoProceed: false,
     })
 
-    // Add DragDrop plugin
     uppy.use(DragDrop, {
       target: dragDropRef.current,
-      note: 'Videos only, up to 5GB each, max 10 files'
+      note: "Videos only, up to 5GB each",
     })
 
-    // Add XHRUpload plugin
-    uppy.use(XHRUpload, {
-      endpoint: '/api/upload/signed-url',
-      method: 'POST',
-      formData: true,
-      fieldName: 'file',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
-      },
-      getResponseData: (xhr: XMLHttpRequest) => {
-        try {
-          return JSON.parse(xhr.responseText)
-        } catch {
-          return {}
-        }
-      }
+    if (progressRef.current) {
+      uppy.use(ProgressBar, {
+        target: progressRef.current,
+        hideAfterFinish: false,
+      })
+    }
+
+    uppy.on("file-added", (file) => {
+      setFiles((prev) => [
+        ...prev,
+        {
+          id: file.id,
+          name: file.name || "Unknown",
+          size: file.size || 0,
+          progress: 0,
+          status: "pending",
+        },
+      ])
     })
 
-    // Event listeners
-    uppy.on('file-added', (file) => {
-      setFiles(prev => [...prev, {
-        id: file.id,
-        name: file.name || 'Unknown',
-        size: file.size || 0,
-        progress: 0,
-        status: 'uploading' as const
-      }])
+    uppy.on("file-removed", (file) => {
+      setFiles((prev) => prev.filter((f) => f.id !== file.id))
     })
-
-    uppy.on('upload-progress', (file, progress) => {
-      if (file && progress.bytesTotal && progress.bytesTotal > 0) {
-        const percentage = Math.round((progress.bytesUploaded / progress.bytesTotal) * 100)
-        setFiles(prev => prev.map(f =>
-          f.id === file.id
-            ? { ...f, progress: percentage }
-            : f
-        ))
-      }
-    })
-
-    uppy.on('upload-success', (file, response) => {
-      setFiles(prev => prev.map(f =>
-        f.id === file?.id
-          ? { ...f, status: 'success' as const, progress: 100, url: response.body?.url }
-          : f
-      ))
-    })
-
-    uppy.on('upload-error', (file, error) => {
-      setFiles(prev => prev.map(f =>
-        f.id === file?.id
-          ? { ...f, status: 'error' as const, error: error.message }
-          : f
-      ))
-    })
-
-    // Note: These events might not be available in the current Uppy version
-    // We'll handle drag state through the DragDrop plugin's built-in styling
 
     uppyRef.current = uppy
 
@@ -107,125 +150,146 @@ export default function VideoUploader() {
     }
   }, [])
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  function updateFile(id: string, updates: Partial<UploadedFile>) {
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)))
   }
 
-  const removeFile = (fileId: string) => {
-    if (uppyRef.current) {
-      uppyRef.current.removeFile(fileId)
+  async function startUpload() {
+    const uppy = uppyRef.current
+    if (!uppy) return
+
+    const uppyFiles = uppy.getFiles()
+
+    for (const uppyFile of uppyFiles) {
+      const file = uppyFile.data as File
+      const id = uppyFile.id
+
+      updateFile(id, { status: "uploading", progress: 0 })
+
+      try {
+        const useMultipart = file.size > DIRECT_UPLOAD_LIMIT
+        const fileId = useMultipart
+          ? await uploadMultipart(file, (pct) => updateFile(id, { progress: pct }))
+          : await uploadDirect(file, (pct) => updateFile(id, { progress: pct }))
+
+        updateFile(id, { status: "success", progress: 100, fileId })
+        uppy.removeFile(id)
+      } catch (err) {
+        updateFile(id, {
+          status: "error",
+          error: err instanceof Error ? err.message : "Upload failed",
+        })
+      }
     }
-    setFiles(prev => prev.filter(f => f.id !== fileId))
   }
 
-  const startUpload = () => {
-    if (uppyRef.current) {
-      uppyRef.current.upload()
-    }
+  function removeFile(id: string) {
+    uppyRef.current?.removeFile(id)
+    setFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
-  const clearCompleted = () => {
-    setFiles(prev => prev.filter(f => f.status === 'uploading'))
+  function clearCompleted() {
+    setFiles((prev) => prev.filter((f) => f.status !== "success" && f.status !== "error"))
   }
+
+  const pendingFiles = files.filter((f) => f.status === "pending")
+  const hasFiles = files.length > 0
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Drag & Drop Zone */}
-      <div
-        ref={dragDropRef}
-        className={`
-          border-2 border-dashed rounded-lg p-8 text-center transition-colors
-          ${isDragOver
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400'
-          }
-        `}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <div>
-            <p className="text-lg font-medium text-gray-900">Drop video files here</p>
-            <p className="text-sm text-gray-500">or click to browse</p>
-          </div>
-          <div className="text-xs text-gray-400">
-            <p>Supports: MP4, MOV, AVI, MKV, WebM</p>
-            <p>Max size: 5GB per file • Max files: 10</p>
-          </div>
-        </div>
-      </div>
+    <div className="w-full">
+      {/* Drop zone */}
+      <div ref={dragDropRef} className="rounded-xl overflow-hidden" />
+      <div ref={progressRef} />
 
-      {/* Upload Controls */}
-      {files.length > 0 && (
-        <div className="mt-6 flex gap-4">
-          <button
-            onClick={startUpload}
-            disabled={files.every(f => f.status !== 'uploading' || f.progress > 0)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Start Upload
-          </button>
-          <button
-            onClick={clearCompleted}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-          >
-            Clear Completed
-          </button>
-        </div>
-      )}
-
-      {/* File List */}
-      {files.length > 0 && (
+      {/* File list */}
+      {hasFiles && (
         <div className="mt-6 space-y-3">
-          <h3 className="text-lg font-medium text-gray-900">Upload Queue</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">
+              {files.length} file{files.length > 1 ? "s" : ""}
+            </h3>
+            <div className="flex gap-3">
+              {pendingFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={startUpload}
+                  className="px-5 py-2 bg-yellow-400 text-gray-900 font-bold rounded-lg hover:bg-yellow-300 transition-colors"
+                >
+                  Upload {pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearCompleted}
+                className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
           {files.map((file) => (
-            <div key={file.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div
+              key={file.id}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4"
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                  <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                  <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                  <p className="text-xs text-blue-200">{formatFileSize(file.size)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    file.status === 'success' ? 'bg-green-100 text-green-800' :
-                    file.status === 'error' ? 'bg-red-100 text-red-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {file.status === 'success' ? 'Complete' :
-                     file.status === 'error' ? 'Failed' :
-                     'Uploading'}
-                  </span>
-                  <button
-                    onClick={() => removeFile(file.id)}
-                    className="text-gray-400 hover:text-red-600"
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      file.status === "success"
+                        ? "bg-green-500/20 text-green-200"
+                        : file.status === "error"
+                          ? "bg-red-500/20 text-red-200"
+                          : file.status === "uploading"
+                            ? "bg-blue-500/20 text-blue-200"
+                            : "bg-white/10 text-white/70"
+                    }`}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                    {file.status === "success"
+                      ? "Done"
+                      : file.status === "error"
+                        ? "Failed"
+                        : file.status === "uploading"
+                          ? `${file.progress}%`
+                          : "Ready"}
+                  </span>
+                  {file.status !== "uploading" && (
+                    <button
+                      type="button"
+                      onClick={() => removeFile(file.id)}
+                      className="text-white/50 hover:text-red-300 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    file.status === 'success' ? 'bg-green-500' :
-                    file.status === 'error' ? 'bg-red-500' :
-                    'bg-blue-500'
-                  }`}
-                  style={{ width: `${file.progress}%` }}
-                ></div>
-              </div>
-
-              {file.error && (
-                <p className="text-xs text-red-600 mt-1">{file.error}</p>
+              {/* Progress bar */}
+              {(file.status === "uploading" || file.status === "success") && (
+                <div className="w-full bg-white/10 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      file.status === "success" ? "bg-green-400" : "bg-yellow-400"
+                    }`}
+                    style={{ width: `${file.progress}%` }}
+                  />
+                </div>
               )}
+
+              {file.error && <p className="text-xs text-red-300 mt-1">{file.error}</p>}
             </div>
           ))}
         </div>

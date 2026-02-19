@@ -1,20 +1,20 @@
-# Main site configuration (Astro Pages)
 name = "sky-dump"
-compatibility_date = "2023-06-14"
-pages_build_output_dir = "dist"
+account_id = "e6bd4c9e08862c4b3c8ddacbbef253b1"
+main = "./dist/_worker.js/index.js"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
 
-# Environment variables for the main site
-[env.production.vars]
-PUBLIC_GOOGLE_CLIENT_ID = ""
-PUBLIC_GOOGLE_REDIRECT_URI = "https://sky-dump.pages.dev/auth/callback"
-PUBLIC_AUTH_WORKER_URL = "https://sky-dump-auth.your-subdomain.workers.dev"
-PUBLIC_UPLOAD_WORKER_URL = "https://sky-dump-upload.your-subdomain.workers.dev"
+[assets]
+binding = "ASSETS"
+directory = "./dist"
 
-[env.preview.vars]
-PUBLIC_GOOGLE_CLIENT_ID = ""
-PUBLIC_GOOGLE_REDIRECT_URI = "http://localhost:4321/auth/callback"
-PUBLIC_AUTH_WORKER_URL = "http://localhost:8787"
-PUBLIC_UPLOAD_WORKER_URL = "http://localhost:8788"
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "sky-dump"
 
-# Additional worker configurations would be in separate wrangler.toml files
-# in their respective directories or managed separately
+[[kv_namespaces]]
+binding = "KV"
+id = "11246a3142cb4050bfa1bfbd60684a4c"
+
+[observability]
+enabled = true

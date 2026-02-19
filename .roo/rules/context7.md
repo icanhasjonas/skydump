@@ -1,1 +1,0 @@
-- Always use `context7` tool to read up on latest documentation and examples
