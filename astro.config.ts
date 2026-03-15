@@ -1,15 +1,9 @@
-import cloudflare from "@astrojs/cloudflare"
 import react from "@astrojs/react"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "astro/config"
 
 export default defineConfig({
-  output: "server",
-  adapter: cloudflare(),
-
-  security: {
-    checkOrigin: false,
-  },
+  output: "static",
 
   integrations: [react()],
 
@@ -18,15 +12,12 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          hashCharacters: "base36",
+          assetFileNames: (info) => {
+            if (info.name?.endsWith(".css")) return "etc/[hash].css"
+            return "usr/lib/[hash][extname]"
+          },
           chunkFileNames: "lib/[hash].js",
           entryFileNames: "lib/[hash].js",
-          assetFileNames(chunkInfo) {
-            if (chunkInfo.names?.some((x) => x.endsWith(".css"))) {
-              return "etc/[hash].[ext]"
-            }
-            return "usr/lib/[hash].[ext]"
-          },
         },
       },
     },

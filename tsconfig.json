@@ -3,10 +3,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
       "@layouts/*": ["src/layouts/*"],
       "@utils/*": ["src/utils/*"]
     },
+    "types": ["@cloudflare/workers-types"],
     "noImplicitAny": true,
     "strictNullChecks": true,
     "jsx": "react-jsx"
